@@ -1,0 +1,45 @@
+[package]
+name = "metastable-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { version = "0.5" }
+clap = { version = "3.2", features = ["derive", "env"] }
+opentelemetry = { version = "0.17", features = ["rt-tokio"], optional = true }
+opentelemetry-jaeger = { version = "0.16", features = ["rt-tokio"], optional = true }
+opentelemetry-datadog = { version = "0.5", optional = true }
+thiserror = "1.0"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1.36"
+tracing-opentelemetry = { version = "0.17", optional = true }
+miette = { version = "5.3", features = ["fancy"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
+axum-server = "0.4.0"
+sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "any", "migrate"] }
+ulid = "0.6.0"
+http = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+rand = "0.8.5"
+hyper = { version = "0.14", features = ["full"] }
+tower = "0.4"
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+tower-http = { version = "0.3", features = ["trace", "request-id", "compression-full"] }
+url = { version = "2", features = ["serde"] }
+
+[features]
+default = ["tracing", "tracing-jaeger", "postgres"]
+tracing = ["dep:tracing-opentelemetry", "dep:opentelemetry", "dep:opentelemetry-jaeger"]
+tracing-jaeger = ["dep:opentelemetry-jaeger", "tracing"]
+tracing-datadog = ["dep:opentelemetry-datadog", "tracing"]
+sqlite = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+
+[profile.release]
+lto = "fat"
+strip = "debuginfo"
+panic = "abort"
+opt-level = "z"
+codegen-units = 1
