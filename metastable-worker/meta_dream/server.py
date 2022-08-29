@@ -9,13 +9,12 @@ import config
 
 app = Flask(__name__)
 
-connection = pika.BlockingConnection(
-    pika.URLParameters(config.AMQP_URL)
-)
+connection = pika.BlockingConnection(pika.URLParameters(config.AMQP_URL))
 
 channel = connection.channel()
+assert channel
 
-EXCHANGE = 'k_lms.stable_diffusion_v1_4.meta-dream.labs.rwx.im'
+EXCHANGE = "k_lms.stable_diffusion_v1_4.meta-dream.labs.rwx.im"
 
 channel.exchange_declare(exchange=EXCHANGE, exchange_type="topic")
 
@@ -23,6 +22,7 @@ for scheduler in ["k_lms", "pndm", "ddim"]:
     result = channel.queue_declare(queue=f"{scheduler}.{EXCHANGE}")
     queue_name = result.method.queue
     channel.queue_bind(exchange=EXCHANGE, queue=queue_name, routing_key="prompt")
+
 
 def valid_dream(json):
     if not "prompt" in json:
@@ -69,54 +69,37 @@ def worker_to_dict(worker):
 
 @app.route("/api/v1/jobs")
 def list_jobs():
-    jobs = queue.get_jobs()
-
-    return ([job_to_dict(job) for job in jobs], 200)
+    return ([], 200)
 
 
 @app.route("/api/v1/jobs/finished")
 def list_finished_jobs():
-    registry = queue.finished_job_registry
-
-    return (registry.get_job_ids(), 200)
+    return ([], 200)
 
 
 @app.route("/api/v1/jobs/started")
 def list_started_jobs():
-    registry = queue.started_job_registry
-
-    return (registry.get_job_ids(), 200)
+    return ([], 200)
 
 
 @app.route("/api/v1/jobs/failed")
 def list_failed_jobs():
-    registry = queue.failed_job_registry
-
-    return (registry.get_job_ids(), 200)
+    return ([], 200)
 
 
 @app.route("/api/v1/jobs/canceled")
 def list_canceled_jobs():
-    registry = queue.canceled_job_registry
-
-    return (registry.get_job_ids(), 200)
+    return ([], 200)
 
 
 @app.route("/api/v1/jobs/<job_id>")
 def get_job(job_id):
-    try:
-        job = Job.fetch(job_id, connection=redis)
-
-        return (job_to_dict(job), 200)
-    except rq.exceptions.NoSuchJobError:
-        return job_not_found(job_id)
+    return job_not_found(job_id)
 
 
 @app.route("/api/v1/workers")
 def list_workers():
-    workers = Worker.all(connection=redis)
-
-    return ([worker_to_dict(worker) for worker in workers], 200)
+    return ([], 200)
 
 
 @app.route("/api/v1/dream", methods=["POST"])
@@ -125,6 +108,9 @@ def post_dream():
         return ({"message": "invalid json"}, 400)
 
     request_json = request.get_json()
+
+    if not request_json:
+        return ({"error": "invalid request"}, 422)
 
     print(request_json)
 

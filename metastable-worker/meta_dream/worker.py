@@ -66,6 +66,7 @@ class Worker:
 
     def on_connection_open(self, _unused_connection):
         LOGGER.info("Connection opened")
+        assert self.connection
 
         LOGGER.info("Creating new channel")
         self.connection.channel(on_open_callback=self.on_channel_open)
@@ -84,6 +85,7 @@ class Worker:
 
     def on_exchange_declareok(self, _unused_frame, userdata):
         LOGGER.info("Exchange declared: %s", userdata)
+        assert self.channel
 
         queue_name = self.queue
         LOGGER.info("Declaring queue %s", queue_name)
@@ -93,6 +95,8 @@ class Worker:
         self.channel.queue_declare(queue=queue_name, callback=cb)
 
     def on_queue_declareok(self, _unused_frame, userdata):
+        assert self.channel
+
         queue_name = userdata
         LOGGER.info(
             "Binding %s to %s with %s", self.EXCHANGE, queue_name, self.routing_key
@@ -116,7 +120,7 @@ class Worker:
     def on_connection_closed(self, _unused_connection, reason):
         self.channel = None
 
-        if self.closing:
+        if self.closing and self.connection:
             self.connection.ioloop.stop()
         else:
             LOGGER.warning("Connection closed, reconnect necessary: %s", reason)
@@ -142,12 +146,19 @@ class Worker:
     def acknowledge_message(self, delivery_tag):
         """Acknowledge the message delivery from RabbitMQ by sending a
         Basic.Ack RPC method for the delivery tag.
+
         :param int delivery_tag: The delivery tag from the Basic.Deliver frame
+
         """
+        assert self.channel
+
         LOGGER.info("Acknowledging message %s", delivery_tag)
+
         self.channel.basic_ack(delivery_tag)
 
     def start_consuming(self):
+        assert self.channel
+
         self.channel.basic_consume(self.queue, self.on_message)
 
     def stop(self):

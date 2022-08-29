@@ -6,7 +6,8 @@ import random
 from typing import List, Optional, Union
 
 
-from PIL import Image
+from PIL import Image as img
+from PIL.Image import Image
 from tqdm.auto import tqdm
 import torch
 from transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
@@ -66,6 +67,7 @@ class StableDiffusionPipeline:
         text_encoder = CLIPTextModel.from_pretrained(
             CLIP_TEXT_ENCODER_MODEL_ID, cache_dir=model_cache_dir
         )
+        assert isinstance(text_encoder, CLIPTextModel)
         self.logger.debug(f"Text encoder: {text_encoder.__class__.__name__}")
 
         # The UNet model for generating the latents.
@@ -95,14 +97,14 @@ class StableDiffusionPipeline:
     def __call__(
         self,
         prompt: str,
-        height: Optional[int] = 512,
-        width: Optional[int] = 512,
-        num_inference_steps: Optional[int] = 50,
-        guidance_scale: Optional[float] = 7.5,
-        eta: Optional[float] = 0.0,
-        seed: Optional[int] = random.randint(0, 2**64),
-        latents: Optional[torch.FloatTensor] = None,
-        output_type: Optional[str] = "pil",
+        height: int = 512,
+        width: int = 512,
+        num_inference_steps: int = 50,
+        guidance_scale: float = 7.5,
+        eta: float = 0.0,
+        seed: int = random.randint(0, 2**64),
+        latents: Optional[torch.Tensor] = None,
+        output_type: str = "pil",
         **kwargs,
     ):
         # Limit to a batch size of 1 until there's better batch handling in
@@ -115,7 +117,7 @@ class StableDiffusionPipeline:
             )
 
         # Create a Generator with a deterministic seed
-        generator = torch.Generator(self.device).manual_seed(seed)
+        generator = torch.Generator(self.device).manual_seed(seed or 0)
 
         print(f"tokenizer model max length: {self.tokenizer.model_max_length}")
 
@@ -192,6 +194,8 @@ class StableDiffusionPipeline:
             extra_step_kwargs["eta"] = eta
 
         for i, t in tqdm(enumerate(self.scheduler.timesteps)):
+            assert latents
+
             # expand the latents if we are doing classifier free guidance
             latent_model_input = (
                 torch.cat([latents] * 2) if do_classifier_free_guidance else latents
@@ -223,6 +227,7 @@ class StableDiffusionPipeline:
                 )["prev_sample"]
 
         # scale and decode the image latents with vae
+        assert latents
         latents = 1 / 0.18215 * latents
         image = self.vae.decode(latents)
 
@@ -237,7 +242,6 @@ class StableDiffusionPipeline:
         sample = Sample(image[0], prompt, seed)
 
         return {"sample": sample}
-
 
     def scheduler_name(self):
         if isinstance(self.scheduler, LMSDiscreteScheduler):
@@ -257,6 +261,6 @@ class StableDiffusionPipeline:
         if images.ndim == 3:
             images = images[None, ...]
         images = (images * 255).round().astype("uint8")
-        pil_images = [Image.fromarray(image) for image in images]
+        pil_images = [img.fromarray(image) for image in images]
 
         return pil_images
